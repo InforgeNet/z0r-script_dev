@@ -1,0 +1,178 @@
+#!/bin/bash
+
+#		Copyright (C) 2015  Nhoya.
+#
+#   z0r is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>
+
+#text clours
+readonly RED="\033[01;31m"
+readonly GREEN="\033[01;32m"
+readonly BLUE="\033[01;34m"
+readonly YELLOW="\033[00;33m"
+readonly BOLD="\033[01m"
+readonly FINE="\033[0m"
+
+ver='v1'
+regex='((https?)*:\/\/)*[-A-Za-z0-9\+&@#/%?=~_|!:,.;]+\.[A-Za-z0-9\+&@%#/=~_|():?]{2,}'
+is_z0r='http://z0r.it/[^ ]'
+mode=-s
+dep=(curl awk xclip wget)
+apikey=4e4b657a91
+clip=$(xclip -o 2>/dev/null)
+LOGDIR=/$HOME/.z0r_logs
+
+#upload function (long -> short)
+shr(){
+	url_e=$(echo $1| sed 's/?/%3F/')
+	short=$(curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e")
+	if  [ -n "$short" ]; then
+		if curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e" |grep -q "Unreachable"; then
+                	echo -e $RED"Invalid URL"$FINE
+		elif  [ -n "$2" ]; then
+			if  curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e" |grep -q "already exists"; then
+                        echo -e $RED"Custom URL already exists"$FINE
+			fi
+		else
+			echo "$short" && echo "$(date +"%d-%h-%Y %H.%M.%S")	-	 $short	-	$1">>$LOGDIR
+        		echo "$short" |xclip -selection clipboard
+		fi
+	else
+	if [ -n "$2" ]; then
+	echo -e $RED"custom URL already in use"$FINE
+	fi
+	fi
+	}
+#expand function (short -> long)
+expand(){
+	avi=$(echo $OPTARG |awk -F '/' '{print$NF}')
+	exp=$(curl $mode -L  "http://z0r.it/yourls-api.php?signature=$apikey&action=cazzoimperio&title=check_with_z0r_scipt&format=simply&shorturl=$avi")
+	echo $exp
+	echo "$exp" |xclip -selection clipboard
+	}
+#help screen
+help(){
+	echo -e "$YELLOW$BOLD$0$FINE $GREEN$ver$FINE, faster uploader for z0r.it shortner. Based on YOURL API"
+	echo "Copyright(C) 2015 Nhoya"
+        echo ""
+        echo -e $BOLD"  Usage: $0 [long_URL] [custom_name]"$FINE
+	echo  "	keep empty custom_name field for normal URL format"
+	echo ""
+	echo -e $GREEN"======================================================================================"$FINE
+	echo " Available Options:"
+	echo "		-e <short_URL>				expand URL (short -> long)"
+	echo "		-h 					display this page"
+	echo "		-c <short_URL>				display numbers of clicks"
+	echo "		-l					show shorting history"
+	echo "		-m <long_URL1> <long_URL2> ...		mass shorting"
+	echo "		-r					reset history"
+	echo -e $GREEN"======================================================================================"$FINE
+
+	}
+#stats
+stats(){
+	lil=$(echo $OPTARG |awk -F '/' '{print$NF}')
+	click=$(curl -s -L "http://z0r.it/yourls-api.php?signature=$apikey&action=url-stats&format=json&shorturl=$lil"|grep -Po '"clicks":.*?[^\\]"')
+	echo $click
+}
+mss(){
+	for i in ${@:2}; do
+		mass=$(curl -s -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&format=simply&url=$(echo $i| sed 's/?/%3F/')")
+ 		if  [ -n "$mass" ] ; then
+			if curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&format=simply&url=$(echo $i| sed 's/?/%3F/')" |grep -q "Unreachable"; then
+                        	echo -e $RED"Invalid URL"$FINE
+                	else
+
+				echo "$mass" && echo "$(date +"%d-%h-%Y %H.%M.%S")       -        $mass   -       $i">>$LOGDIR
+			fi
+		else
+			echo -e $RED"Bad Request"$FINE
+		fi
+	done
+}
+#control over argument
+is_url(){
+		if [[ $1 =~ $regex ]];then
+		shr $1 $2
+		else
+		echo -e $RED""$1" is not a valid URL"$FINE
+		fi
+}
+#check dipendencies
+checkdep(){
+	for i in "${dep[@]}"; do
+        if  ( ! which $i &>/dev/null ); then
+        	echo -e $RED"$i not found, solve the dipendencies before running the script"$FINE
+		missing="1"
+	fi
+	done
+}
+del_history(){
+	echo -e $RED"Are you sure? History can not be restored [y/n]"$FINE
+	read input
+	case $input in
+		[Yy]) echo "" > $LOGDIR
+		;;
+		*) exit 0
+		;;
+	esac
+}
+#option parser
+opsparser(){
+while getopts ":hvlre:c:m:" opt; do
+		case "$opt" in
+		h)	help
+		exit 0
+		;;
+		e)	if [[ $OPTARG =~ $is_z0r ]];then
+				expand $OPTARG
+			else
+				echo -e  $RED"Enter a valid z0r url(http://z0r.it/...)"$FINE
+			fi
+			exit 0
+		;;
+		c)	stats $OPTARG
+			exit 0
+		;;
+		m)
+			mss $@
+			exit 0
+		;;
+		v)	echo $ver
+			exit 0
+		;;
+		l)	echo -e $GREEN"====================================================LOGs==============================================="$FINE
+			cat $LOGDIR
+			echo -e $GREEN"======================================================================================================="$FINE
+			exit 0
+		;;
+		r)	del_history
+			exit 0
+		;;
+		\?) 	echo -e $RED"enter a valid option, use -h for help"$FINE
+		exit 0
+		;;
+		esac
+done
+}
+
+checkdep
+if [ "$missing" == "1" ]; then
+        exit 0
+fi
+opsparser $@
+if [ "$#" == "0" ]; then
+	is_url $clip
+else
+	is_url $1 $2
+fi
