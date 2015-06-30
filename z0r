@@ -32,20 +32,40 @@ apikey=4e4b657a91
 clip=$(xclip -o 2>/dev/null)
 LOGDIR=/$HOME/.z0r_logs
 
+pb(){
+while true
+do
+	echo -ne $BLUE'[✵   ]\r'$FINE
+	sleep 0.2
+        echo -ne $BLUE'[✵✵  ]\r'$FINE
+	sleep 0.2
+        echo -ne $BLUE'[✵✵✵ ]\r'$FINE
+        sleep 0.2
+        echo -ne $BLUE'[ ✵✵✵]\r'$FINE
+	sleep 0.2
+        echo -ne $BLUE'[  ✵✵]\r'$FINE
+	sleep 0.2
+        echo -ne $BLUE'[   ✵]\r'$FINE
+done
+}
+
 #upload function (long -> short)
 shr(){
 	url_e=$(echo $1| sed 's/?/%3F/')
-	short=$(curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e")
+	pb & short=$(curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e")
 	if  [ -n "$short" ]; then
 		if curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e" |grep -q "Unreachable"; then
-                	echo -e $RED"Invalid URL"$FINE
+			kill $!; trap 'kill $!' SIGTERM
+                	echo -e $RED"Invalid URL\r"$FINE
 		elif  [ -n "$2" ]; then
 			if  curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&keyword=$2&format=simply&url=$url_e" |grep -q "already exists"; then
-                        echo -e $RED"Custom URL already exists"$FINE
+			kill $!; trap 'kill $!' SIGTERM
+                        echo -e $RED"Custom URL already exists\r"$FINE
 			fi
 		else
+			kill $!; trap 'kill $!' SIGTERM
 			echo "$short" && echo "$(date +"%d-%h-%Y %H.%M.%S")	-	 $short	-	$1">>$LOGDIR
-        		echo "$short" |xclip -selection clipboard
+        		echo -e "$short\r" |xclip -selection clipboard
 		fi
 	else
 	if [ -n "$2" ]; then
@@ -87,16 +107,18 @@ stats(){
 }
 mss(){
 	for i in ${@:2}; do
-		mass=$(curl -s -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&format=simply&url=$(echo $i| sed 's/?/%3F/')")
+		pb & mass=$(curl -s -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&format=simply&url=$(echo $i| sed 's/?/%3F/')")
  		if  [ -n "$mass" ] ; then
 			if curl $mode -L "http://z0r.it/yourls-api.php?signature=$apikey&action=shorturl&title=uploaded_with_z0r_script&format=simply&url=$(echo $i| sed 's/?/%3F/')" |grep -q "Unreachable"; then
-                        	echo -e $RED"Invalid URL"$FINE
+                        	kill $!; trap 'kill $!' SIGTERM
+				echo -e $RED"Invalid URL\r"$FINE
                 	else
-
-				echo "$mass" && echo "$(date +"%d-%h-%Y %H.%M.%S")       -        $mass   -       $i">>$LOGDIR
+				kill $!; trap 'kill $!' SIGTERM
+				echo -e "$mass\r" && echo "$(date +"%d-%h-%Y %H.%M.%S")       -        $mass   -       $i">>$LOGDIR
 			fi
 		else
-			echo -e $RED"Bad Request"$FINE
+			kill $!; trap 'kill $!' SIGTERM
+			echo -e $RED"Bad Request\r"$FINE
 		fi
 	done
 }
